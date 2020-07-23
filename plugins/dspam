@@ -205,6 +205,9 @@ use Qpsmtpd::DSN;
 use IO::Handle;
 use Socket qw(:DEFAULT :crlf);
 
+my $TIMEOUT_ERROR = "plugin timeout\n";
+my $TIMEOUT_SECONDS = 30;
+
 sub register {
     my $self = shift;
     my $qp = shift;
@@ -255,7 +258,21 @@ sub data_post_handler {
       "$bin --user $user --mode=tum --process --deliver=summary --stdout";
     $self->log(LOGDEBUG, $filtercmd);
 
-    my $response = $self->dspam_process($filtercmd, $transaction);
+    eval {
+        local $SIG{ALRM} = sub { die $TIMEOUT_ERROR };
+        alarm $TIMEOUT_SECONDS;
+
+        my $response = $self->dspam_process($filtercmd, $transaction);
+
+        alarm 0;
+    };
+    if ($@) {
+        die unless $@ eq $TIMEOUT_ERROR;
+
+        $self->log(LOGWARN, "timeout calling dspam. Check logs for errors.");
+        return DECLINED;
+    }
+
     if (!$response->{result}) {
         $self->log(LOGWARN, "error, no dspam response. Check logs for errors.");
         return DECLINED;
