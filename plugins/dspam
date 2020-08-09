@@ -681,7 +681,10 @@ sub autolearn_karma {
         return 1;
     }
 
-    if ($karma > 2 && $response->{result} eq 'Spam') {
+    if ($karma > 2 && $response->{result} eq 'Spam' &&
+        $transaction->sender->host ne "hotmail.com" &&
+        $transaction->sender->host ne "outlook.com")
+    {
         $self->log(LOGINFO, "training good karma ($karma) FP as ham");
         $self->train_error_as_ham($transaction);
         return 1;
